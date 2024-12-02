@@ -76,7 +76,7 @@ fn read_line(history: &[SmallString]) -> Option<SmallString> {
 				idx = 0;
 			}
 			Ok(Event::Key(Key::Ctrl('e' | 'E'))) => {
-				idx = out.len();
+				idx = actual_length;
 			}
 			Ok(Event::Key(Key::Up | Key::Ctrl('p' | 'P'))) => {
 				history_index = history_index.saturating_sub(1);
