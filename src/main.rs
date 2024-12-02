@@ -24,7 +24,9 @@ fn main() {
 
 	let mut history = Vec::new();
 	while let Some(line) = read_line(&history) {
-		history.push(line.clone());
+		if !line.is_empty() {
+			history.push(line.clone());
+		}
 
 		match writeln!(&mut inner_stdin, "\r\n{line}") {
 			Ok(_) => {}
@@ -55,33 +57,46 @@ fn read_line(history: &[SmallString]) -> Option<SmallString> {
 	std::thread::sleep(Duration::from_millis(200));
 
 	let mut history_index = history.len();
+	let mut idx = 0usize;
 
 	let mut out = SmallString::new();
 	let mut raw_mode_handle = std::io::stdout().into_raw_mode().unwrap();
-	let stdin = std::io::stdin();
-	let mut stdout = std::io::stdout();
+	rerender_line(&mut raw_mode_handle, &out, idx);
 
-	rerender_line(&mut raw_mode_handle, &out);
-	for c in stdin.events() {
-		let _ = stdout.flush();
+	for c in std::io::stdin().events() {
+		let actual_length = out.chars().count();
 		match c {
+			Ok(Event::Key(Key::Left)) => {
+				idx = idx.saturating_sub(1);
+			}
+			Ok(Event::Key(Key::Right)) => {
+				idx = (idx + 1).min(actual_length);
+			}
+			Ok(Event::Key(Key::Ctrl('a' | 'A'))) => {
+				idx = 0;
+			}
+			Ok(Event::Key(Key::Ctrl('e' | 'E'))) => {
+				idx = out.len();
+			}
 			Ok(Event::Key(Key::Up | Key::Ctrl('p' | 'P'))) => {
 				history_index = history_index.saturating_sub(1);
 				if let Some(line) = history.get(history_index) {
 					out = line.clone();
-					rerender_line(&mut raw_mode_handle, &out);
+					idx = idx.min(actual_length);
 				}
 			}
 			Ok(Event::Key(Key::Down | Key::Ctrl('n' | 'N'))) => {
 				history_index = (history_index + 1).max(history.len());
 				if let Some(line) = history.get(history_index) {
 					out = line.clone();
-					rerender_line(&mut raw_mode_handle, &out);
+					idx = idx.min(actual_length);
 				}
 			}
 			Ok(Event::Key(Key::Char('\n'))) => {
-				let _ = raw_mode_handle.write(termion::clear::CurrentLine.as_ref()).unwrap();
-				let _ = raw_mode_handle.write(b"\r");
+				let _ = raw_mode_handle
+					.write(termion::clear::CurrentLine.as_ref())
+					.unwrap();
+				let _ = raw_mode_handle.write(b"\r").unwrap();
 				raw_mode_handle.flush().unwrap();
 				break;
 			}
@@ -89,20 +104,25 @@ fn read_line(history: &[SmallString]) -> Option<SmallString> {
 				if out.len() < 2 {
 					continue;
 				}
-				let last_two = &out[out.len() - 2..out.len()];
+				let last_two = &out.get(out.len() - 2..out.len());
 				if let Some((_, apl_char)) = apl_symbols::APL_SYMBOLS
 					.iter()
-					.find(|(key, _)| *key == last_two)
+					.find(|(key, _)| Some(*key) == *last_two)
 				{
 					out.pop();
 					out.pop();
 					out.push(*apl_char);
-					rerender_line(&mut raw_mode_handle, &out);
+					idx -= 1;
 				}
 			}
 			Ok(Event::Key(Key::Ctrl('c' | 'C'))) => {
-				std::mem::drop(std::io::stdout().into_raw_mode());
-				std::process::exit(-1);
+				if out.is_empty() {
+					raw_mode_handle.suspend_raw_mode().unwrap();
+					std::process::exit(-1);
+				} else {
+					out.clear();
+					idx = 0;
+				}
 			}
 			Ok(Event::Key(Key::Ctrl('d' | 'D'))) => {
 				out.clear();
@@ -110,15 +130,30 @@ fn read_line(history: &[SmallString]) -> Option<SmallString> {
 				break;
 			}
 			Ok(Event::Key(Key::Backspace)) => {
-				out.pop();
-				rerender_line(&mut raw_mode_handle, &out);
+				if idx == actual_length {
+					out.pop();
+				} else if idx != 0 {
+					let byte_idx = out.char_indices().nth(idx).map(|(i, _)| i).unwrap_or(0);
+					out.remove(byte_idx);
+				}
+				idx = idx.saturating_sub(1);
 			}
 			Ok(Event::Key(Key::Char(c))) => {
-				out.push(c);
-				rerender_line(&mut raw_mode_handle, &out);
+				if idx == out.len() {
+					out.push(c);
+				} else {
+					let byte_idx = out
+						.char_indices()
+						.nth(idx)
+						.map(|(i, _)| i)
+						.unwrap_or(out.len());
+					out.insert(byte_idx, c);
+				}
+				idx += 1;
 			}
 			_ => {}
 		}
+		rerender_line(&mut raw_mode_handle, &out, idx);
 	}
 
 	std::mem::drop(raw_mode_handle);
@@ -126,9 +161,15 @@ fn read_line(history: &[SmallString]) -> Option<SmallString> {
 	Some(out)
 }
 
-fn rerender_line(raw: &mut RawTerminal<Stdout>, s: &str) {
-	let _ = raw.write(termion::clear::CurrentLine.as_ref()).unwrap();
-	let _ = raw.write(b"\r> ");
-	let _ = raw.write(s.as_bytes()).unwrap();
+fn rerender_line(raw: &mut RawTerminal<Stdout>, s: &str, idx: usize) {
+	write!(
+		raw,
+		"{}\r> {}{}{}",
+		termion::clear::CurrentLine,
+		s,
+		termion::cursor::Left(1000),
+		termion::cursor::Right((idx + 2) as _)
+	)
+	.unwrap();
 	raw.flush().unwrap();
 }
