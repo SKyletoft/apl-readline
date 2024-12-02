@@ -21,6 +21,7 @@ fn main() {
 		.spawn()
 		.unwrap();
 	let mut inner_stdin = dyalog.stdin.take().unwrap();
+	std::thread::sleep(Duration::from_millis(200));
 
 	let mut history = Vec::new();
 	while let Some(line) = read_line(&history) {
