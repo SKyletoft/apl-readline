@@ -7,7 +7,10 @@
 	outputs = { self, nixpkgs, flake-utils }:
 		flake-utils.lib.eachDefaultSystem(system:
 			let
-				pkgs = import nixpkgs { inherit system; };
+				pkgs = import nixpkgs {
+					inherit system;
+					config.allowUnfree = true; # APL
+				};
 				rust-env = with pkgs; [
 					cargo
 					rustc
@@ -16,6 +19,7 @@
 					rust-analyzer
 					gdb
 				];
+				buildInputs = [( pkgs.dyalog.override { acceptLicense = true; } )];
 			in {
 				packages.default = pkgs.rustPlatform.buildRustPackage {
 					pname = "apl-readline";
@@ -23,8 +27,11 @@
 
 					src = ./.;
 					cargoLock.lockFile = ./Cargo.lock;
+
+					inherit buildInputs;
 				};
 				devShells.default = pkgs.mkShell {
+					inherit buildInputs;
 					nativeBuildInputs = rust-env;
 				};
 			}

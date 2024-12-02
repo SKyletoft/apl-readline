@@ -1,3 +1,4 @@
+// TODO: Whenever possible in stable const rust: convert this to a map
 pub const APL_SYMBOLS: &[(&str, char)] = &[
 	("ll", '⌊'),
 	("aa", '⍺'),
@@ -7,7 +8,6 @@ pub const APL_SYMBOLS: &[(&str, char)] = &[
 	("~\"", '⍨'),
 	("~:", '⍨'),
 	("|_", '⊥'),
-	("bot", '⊥'),
 	("==", '≡'),
 	("=_", '≡'),
 	(":-", '÷'),
@@ -64,7 +64,7 @@ pub const APL_SYMBOLS: &[(&str, char)] = &[
 	("oo", '∘'),
 	("O:", '⍥'),
 	("O\"", '⍥'),
-	(": o,", '○'),
+	("oo", '○'),
 	("o:", '⍤'),
 	("o\"", '⍤'),
 	("VV", '∇'),
