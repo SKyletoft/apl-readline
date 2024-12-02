@@ -19,19 +19,24 @@
 					rust-analyzer
 					gdb
 				];
-				buildInputs = [( pkgs.dyalog.override { acceptLicense = true; } )];
+				dyalog = pkgs.dyalog.override { acceptLicense = true; };
 			in {
-				packages.default = pkgs.rustPlatform.buildRustPackage {
-					pname = "apl-readline";
-					version = "0.0.1";
+				packages = rec {
+					apl-readline = pkgs.rustPlatform.buildRustPackage {
+						pname = "apl-readline";
+						version = "0.0.1";
 
-					src = ./.;
-					cargoLock.lockFile = ./Cargo.lock;
-
-					inherit buildInputs;
+						src = ./.;
+						cargoLock.lockFile = ./Cargo.lock;
+					};
+					apl = pkgs.writeShellScriptBin "apl" ''
+						export PATH=${pkgs.lib.strings.makeBinPath [ dyalog pkgs.coreutils ] }
+						${apl-readline}/bin/apl-readline
+					'';
+					default = apl;
 				};
 				devShells.default = pkgs.mkShell {
-					inherit buildInputs;
+					buildInputs = [ dyalog ];
 					nativeBuildInputs = rust-env;
 				};
 			}
