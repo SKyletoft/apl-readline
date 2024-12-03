@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 termion = "4.0"
-smallstr = "0.3"
+smallvec = { version ="1.13.2", features = ["union"] }
+anyhow = "1.0"
